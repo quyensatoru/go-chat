@@ -1,0 +1,5 @@
+.github
+.env
+/tmp/*
+# config firebase
+serviceAccountKey.json  
