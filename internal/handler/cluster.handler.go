@@ -2,6 +2,7 @@ package handler
 
 import (
 	contextkey "backend/internal/common/contextKey"
+	"backend/internal/model"
 	"backend/internal/response"
 	"backend/internal/service"
 	"log"
@@ -12,12 +13,21 @@ import (
 )
 
 type ClusterHandler struct {
-	svc         *service.ClusterService
-	userService *service.UserService
+	svc           *service.ClusterService
+	userService   *service.UserService
+	deployService *service.DeploymentService
+	envService    *service.EnviromentService
+	autoService   *service.AutomationService
 }
 
-func NewClusterHandler(svc *service.ClusterService, userService *service.UserService) *ClusterHandler {
-	return &ClusterHandler{svc: svc, userService: userService}
+func NewClusterHandler(svc *service.ClusterService, userService *service.UserService, deployService *service.DeploymentService, envService *service.EnviromentService, autoService *service.AutomationService) *ClusterHandler {
+	return &ClusterHandler{
+		svc:           svc,
+		userService:   userService,
+		deployService: deployService,
+		envService:    envService,
+		autoService:   autoService,
+	}
 }
 
 func (h *ClusterHandler) Create(c *gin.Context) {
@@ -47,8 +57,6 @@ func (h *ClusterHandler) Create(c *gin.Context) {
 	cluster["created_by"] = user.ID
 	cluster["status"] = "pending"
 
-	log.Printf("user %v", cluster)
-
 	resultId, err := h.svc.CreateCluster(c, cluster)
 
 	if err != nil {
@@ -59,6 +67,17 @@ func (h *ClusterHandler) Create(c *gin.Context) {
 	payload := map[string]interface{}{
 		"insertedId": resultId.InsertedID,
 	}
+
+	go func() {
+		//run automation install k3s
+		err := h.autoService.AutoInstallK3sToServer(&model.Cluster{
+			IpAddress: cluster["ip_address"].(string),
+			Username:  cluster["username"].(string),
+			Password:  cluster["password"].(string),
+		})
+
+		log.Printf("Error check install k3s %v", err)
+	}()
 
 	response.Success(c, payload)
 }

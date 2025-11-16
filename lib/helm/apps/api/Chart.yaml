@@ -1,0 +1,17 @@
+apiVersion: v2
+name: api
+description: A Helm chart for api server
+version: 0.1.0
+appVersion: "1.0.0"
+type: application
+
+dependencies:
+  - name: mongodb
+    version: 15.x.x
+    repository: "https://charts.bitnami.com/bitnami"
+  - name: redis
+    version: 19.x.x
+    repository: "https://charts.bitnami.com/bitnami"
+  - name: rabbitmq
+    version: 14.x.x
+    repository: "https://charts.bitnami.com/bitnami"

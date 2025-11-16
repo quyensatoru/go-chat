@@ -1,0 +1,18 @@
+appConfig:
+  PORT: 3000
+  API_URL: "http://localhost:3000"
+  MONGODB_URI: "mongodb://myapp-mongodb:27017/blocker?retryWrites=true&w=majority"
+  REDIS_URI: "redis://myapp-redis-master:6379"
+  AMQP_URI: "amqp://guest:guest@myapp-rabbitmq:5672"
+  DB_NAME: "blocker"
+  API_VERSION: "2024-10"
+  SHOPIFY_THEME_EXTENSION_ID: "ff7a3026-ec65-4260-acd7-b124a80fac99"
+  AWS_BUCKET_NAME: "shopify-dev-4"
+  AWS_BUCKET_REGION: "us-east-2"
+  AWS_ACCESS_KEY: "AKIAW7TTWFZITK5ZTOZ6"
+  AWS_SECRET_KEY: "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"
+
+appSecret:
+  SHOPIFY_API_KEY: "980dcbce022a8d27e97acd0813ae7520"
+  SHOPIFY_API_SECRET: "80f0bbcfb4f5876114c6dd43d358ad2f"
+  PROXY_CHECK_API_KEY: "y57167-e862sn-261tc7-vc1774"

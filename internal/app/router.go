@@ -24,25 +24,39 @@ func Router(a *gin.Engine, db *mongo.Database, fb *firebase.App) {
 	collectionMessage := db.Collection("messages")
 	collectionConversation := db.Collection("conversations")
 	colectionCluster := db.Collection("clusters")
+	collectionDeployment := db.Collection("deployments")
+	collectionEviroment := db.Collection("enviroments")
 
 	// init repo
 	userRepo := repository.NewUserRepository(collectionUser)
 	messageRepo := repository.NewMessageRepository(collectionMessage)
 	conversationRepo := repository.NewConversationRepository(collectionConversation)
 	clusterRepo := repository.NewClusterRepository(colectionCluster)
+	deploymentRepo := repository.NewDeploymentRepository(collectionDeployment)
+	enviromentRepo := repository.NewEnviromentRepository(collectionEviroment)
 
 	// init service
 	userService := service.NewUserService(userRepo)
 	messageService := service.NewMessageService(messageRepo)
 	conversationService := service.NewConversationService(conversationRepo)
 	clusterService := service.NewClusterService(clusterRepo)
+	autoService := service.NewAutomationService(clusterRepo)
+	deploymentService := service.NewDeploymentService(deploymentRepo)
+	enviromentService := service.NewEnviromentService(enviromentRepo)
 
 	// init handler
 	userHandler := handler.NewUserHandler(userService, fbService)
 	hub := websocket.NewHub()
 	go hub.Run()
 	wsHandler := handler.NewWsHandler(hub, messageService, userService, conversationService)
-	clusterHandler := handler.NewClusterHandler(clusterService, userService)
+	clusterHandler := handler.NewClusterHandler(
+		clusterService,
+		userService,
+		deploymentService,
+		enviromentService,
+		autoService,
+	)
+	deploymentHandler := handler.NewDeploymentHandler(deploymentService, enviromentService, autoService)
 
 	a.POST("/user/profile", userHandler.CreateNewAccount)
 
@@ -50,6 +64,7 @@ func Router(a *gin.Engine, db *mongo.Database, fb *firebase.App) {
 	userAuth := a.Group("/user", authMiddleware)
 	messageAuth := a.Group("/message", authMiddleware)
 	clusterAuth := a.Group("/clusters", authMiddleware)
+	deploymentAuth := a.Group("/deployments", authMiddleware)
 	{
 		userAuth.GET("", userHandler.GetAll)
 	}
@@ -59,5 +74,9 @@ func Router(a *gin.Engine, db *mongo.Database, fb *firebase.App) {
 	{
 		clusterAuth.GET("", clusterHandler.FindAll)
 		clusterAuth.POST("", clusterHandler.Create)
+	}
+	{
+		deploymentAuth.GET("", deploymentHandler.FindAll)
+		deploymentAuth.POST("", deploymentHandler.Create)
 	}
 }
