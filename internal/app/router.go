@@ -10,73 +10,74 @@ import (
 
 	firebase "firebase.google.com/go"
 	"github.com/gin-gonic/gin"
-	"go.mongodb.org/mongo-driver/mongo"
+	"gorm.io/gorm"
 )
 
-func Router(a *gin.Engine, db *mongo.Database, fb *firebase.App) {
+func Router(a *gin.Engine, db *gorm.DB, fb *firebase.App) {
 	fbService, err := service.NewFirebaseService(fb)
 
 	if err != nil {
-		log.Fatal("❌ Could new instant firebase service:", err)
+		log.Fatal("❌ Could not instantiate firebase service:", err)
 	}
-	// init collection
-	collectionUser := db.Collection("users")
-	collectionMessage := db.Collection("messages")
-	collectionConversation := db.Collection("conversations")
-	colectionCluster := db.Collection("clusters")
-	collectionDeployment := db.Collection("deployments")
-	collectionEviroment := db.Collection("enviroments")
 
-	// init repo
-	userRepo := repository.NewUserRepository(collectionUser)
-	messageRepo := repository.NewMessageRepository(collectionMessage)
-	conversationRepo := repository.NewConversationRepository(collectionConversation)
-	clusterRepo := repository.NewClusterRepository(colectionCluster)
-	deploymentRepo := repository.NewDeploymentRepository(collectionDeployment)
-	enviromentRepo := repository.NewEnviromentRepository(collectionEviroment)
+	// Init repositories
+	userRepo := repository.NewUserRepository(db)
+	messageRepo := repository.NewMessageRepository(db)
+	serverRepo := repository.NewServerRepository(db)
+	appRepo := repository.NewAppRepository(db)
 
-	// init service
+	// Init services
 	userService := service.NewUserService(userRepo)
 	messageService := service.NewMessageService(messageRepo)
-	conversationService := service.NewConversationService(conversationRepo)
-	clusterService := service.NewClusterService(clusterRepo)
-	autoService := service.NewAutomationService(clusterRepo)
-	deploymentService := service.NewDeploymentService(deploymentRepo)
-	enviromentService := service.NewEnviromentService(enviromentRepo)
+	serverService := service.NewServerService(serverRepo)
+	automationService := service.NewServerAutomationService(serverRepo)
+	appService := service.NewAppService(appRepo, serverRepo, automationService)
 
-	// init handler
-	userHandler := handler.NewUserHandler(userService, fbService)
+	// Init handlers
+	userHandler := handler.NewUserHandler(userService, *fbService)
+	serverHandler := handler.NewServerHandler(serverService, userService)
+	appHandler := handler.NewAppHandler(appService)
+	automationHandler := handler.NewServerAutomationHandler(serverService, automationService)
+
+	// WebSocket hub
 	hub := websocket.NewHub()
 	go hub.Run()
-	wsHandler := handler.NewWsHandler(hub, messageService, userService, conversationService)
-	clusterHandler := handler.NewClusterHandler(
-		clusterService,
-		userService,
-		deploymentService,
-		enviromentService,
-		autoService,
-	)
-	deploymentHandler := handler.NewDeploymentHandler(deploymentService, enviromentService, autoService)
+	wsHandler := handler.NewWsHandler(hub, messageService, userService)
 
+	// Public routes
 	a.POST("/user/profile", userHandler.CreateNewAccount)
 
+	// Protected routes
 	authMiddleware := middleware.FirebaseAuthMiddleware(fbService)
 	userAuth := a.Group("/user", authMiddleware)
 	messageAuth := a.Group("/message", authMiddleware)
-	clusterAuth := a.Group("/clusters", authMiddleware)
-	deploymentAuth := a.Group("/deployments", authMiddleware)
+	serverAuth := a.Group("/servers", authMiddleware)
+	appAuth := a.Group("/apps", authMiddleware)
+
 	{
 		userAuth.GET("", userHandler.GetAll)
+		userAuth.GET("/:id", userHandler.GetByID)
 	}
 	{
 		messageAuth.GET("/ws", wsHandler.Handle)
 	}
 	{
-		clusterAuth.GET("", clusterHandler.FindAll)
-		clusterAuth.POST("", clusterHandler.Create)
+		serverAuth.GET("", serverHandler.FindAll)
+		serverAuth.POST("", serverHandler.Create)
+		serverAuth.GET("/:id", serverHandler.GetByID)
+		serverAuth.PUT("/:id", serverHandler.Update)
+		serverAuth.DELETE("/:id", serverHandler.Delete)
+
+		// Server automation endpoints
+		serverAuth.POST("/:id/check-connection", automationHandler.CheckConnection)
+		serverAuth.POST("/:id/install-k8s", automationHandler.InstallK8s)
 	}
 	{
-		deploymentAuth.GET("", deploymentHandler.FindAll)
-		deploymentAuth.POST("", deploymentHandler.Create)
+		appAuth.GET("", appHandler.FindAll)
+		appAuth.POST("", appHandler.Create)
+		appAuth.GET("/:id", appHandler.GetByID)
+		appAuth.GET("/server/:serverId", appHandler.GetByServerID)
+		appAuth.PUT("/:id", appHandler.Update)
+		appAuth.DELETE("/:id", appHandler.Delete)
 	}
 }

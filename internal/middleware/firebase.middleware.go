@@ -5,6 +5,7 @@ import (
 	"backend/internal/response"
 	"backend/internal/service"
 	"context"
+	"fmt"
 
 	"github.com/gin-gonic/gin"
 )
@@ -21,6 +22,7 @@ func FirebaseAuthMiddleware(firebaseSerivce *service.FirebaseService) gin.Handle
 		verify, err := firebaseSerivce.VerifyToken(ctx.Request.Context(), token)
 
 		if err != nil {
+			fmt.Printf("❌ Failed to verify token: %w", err)
 			response.Forbidden(ctx, "invalid or expired token")
 			return
 		}
@@ -30,6 +32,5 @@ func FirebaseAuthMiddleware(firebaseSerivce *service.FirebaseService) gin.Handle
 		ctx.Request = ctx.Request.WithContext(newCtx)
 
 		ctx.Next()
-
 	}
 }

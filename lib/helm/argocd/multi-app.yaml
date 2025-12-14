@@ -9,19 +9,17 @@ spec:
     - matrix:
         generators:
 
-          # Lấy danh sách site
           - git:
-              repoURL: https://github.com/yourorg/gitops.git
-              revision: main
+              repoURL: https://github.com/quyensatoru/gitops.git
+              revision: chart/blocker
               directories:
-                - path: envs/*
+                - path: helm/envs/*
 
-          # Lấy danh sách apps
           - git:
-              repoURL: https://github.com/yourorg/gitops.git
-              revision: main
+              repoURL: https://github.com/quyensatoru/gitops.git
+              revision: chart/blocker
               directories:
-                - path: apps/*
+                - path: helm/apps/*
 
   template:
     metadata:
@@ -30,12 +28,13 @@ spec:
       project: default
 
       source:
-        repoURL: https://github.com/yourorg/gitops.git
-        targetRevision: main
-        chart: apps/{{path[1].basename}}
+        repoURL: https://github.com/quyensatoru/gitops.git
+        targetRevision: chart/blocker
+        path: helm/apps/{{path[1].basename}}
         helm:
           valueFiles:
-            - envs/{{path[0].basename}}/{{path[1].basename}}/values.yaml
+            - helm/apps/{{path[1].basename}}/values.yaml
+            - helm/envs/{{path[0].basename}}/{{path[1].basename}}/values.yaml
 
       destination:
         server: https://kubernetes.default.svc

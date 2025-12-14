@@ -49,3 +49,11 @@ func InternalError(c *gin.Context, err interface{}) {
 func Forbidden(c *gin.Context, m string) {
 	c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": m})
 }
+
+// 404 Not Found
+func NotFound(c *gin.Context, message string) {
+	c.JSON(http.StatusNotFound, Response{
+		Success: false,
+		Message: message,
+	})
+}

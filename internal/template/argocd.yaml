@@ -1,0 +1,46 @@
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: multi-site
+  namespace: argocd
+spec:
+  generators:
+    - matrix:
+        generators:
+          # Lấy danh sách site / envs
+          - git:
+              repoURL: {{ gitopsRepo }}
+              revision: {{ gitopsRevision }}
+              directories:
+                - path: envs/*
+              pathParamPrefix: env
+
+          # Lấy danh sách apps
+          - git:
+              repoURL: {{ gitopsRepo }}
+              revision: {{ gitopsRevision }}
+              directories:
+                - path: apps/*
+              pathParamPrefix: app
+  template:
+    metadata:
+      name: "{{env.path.basename}}-{{app.path.basename}}"
+    spec:
+      project: default
+      source:
+        repoURL: {{ gitopsRepo }}
+        targetRevision: {{ gitopsRevision }}
+        path: apps/{{app.path.basename}}
+        helm:
+          valueFiles:
+            - values.yaml
+            - ../../envs/{{env.path.basename}}/values-{{app.path.basename}}.yaml
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: "{{env.path.basename}}"
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        syncOptions:
+          - CreateNamespace=true

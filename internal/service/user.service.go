@@ -1,104 +1,82 @@
 package service
 
 import (
-	contextkey "backend/internal/common/contextKey"
 	"backend/internal/model"
 	"backend/internal/repository"
-	"context"
-	"fmt"
-	"time"
+	"errors"
 
-	"firebase.google.com/go/auth"
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/mongo/options"
+	"golang.org/x/crypto/bcrypt"
 )
 
-type UserService struct {
-	repo *repository.UserRepository
+type UserService interface {
+	CreateUser(user *model.User) error
+	FindUserByEmail(email string) (*model.User, error)
+	FindUserByID(id uint) (*model.User, error)
+	GetAllUsers() ([]model.User, error)
+	UpdateUser(user *model.User) error
+	DeleteUser(id uint) error
+	ValidatePassword(hashedPassword, password string) error
+	HashPassword(password string) (string, error)
+	FindUserByUID(id string) (*model.User, error)
 }
 
-func NewUserService(repo *repository.UserRepository) *UserService {
-	return &UserService{
-		repo: repo,
-	}
+type userService struct {
+	repo repository.UserRepository
 }
 
-func (s *UserService) GetAll(ctx context.Context) ([]*model.User, error) {
-	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+func NewUserService(repo repository.UserRepository) UserService {
+	return &userService{repo: repo}
+}
 
-	defer cancel()
-
-	token, ok := ctx.Value(contextkey.UserFirebase).(*auth.Token)
-
-	if !ok {
-		return nil, fmt.Errorf("unauthorized: missing user UID in context")
-	}
-
-	email := token.Claims["email"].(string)
-
-	filter := bson.M{
-		"email": bson.M{
-			"$ne": email,
-		},
-	}
-
-	users, err := s.repo.GetAll(ctx, filter)
-
+func (s *userService) CreateUser(user *model.User) error {
+	// Check if user already exists
+	existingUser, err := s.repo.FindByEmail(user.Email)
 	if err != nil {
-		return nil, err
+		return err
+	}
+	if existingUser != nil {
+		return errors.New("user with this email already exists")
 	}
 
-	return users, nil
-}
-
-func (s *UserService) GetByID(ctx context.Context, id string) (*model.User, error) {
-	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
-	defer cancel()
-	return s.repo.GetByID(ctx, id)
-}
-
-func (s *UserService) GetByEmail(ctx context.Context, email string) (*model.User, error) {
-	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
-	defer cancel()
-	return s.repo.FindOne(ctx, bson.M{
-		"email": email,
-	})
-}
-
-func (s *UserService) CreateByFirbase(ctx context.Context, payload *auth.Token) (*model.User, error) {
-	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
-	defer cancel()
-
-	update := bson.M{
-		"$set": bson.M{
-			"email":     payload.Claims["email"].(string),
-			"username":  payload.Claims["name"].(string),
-			"token":     payload.UID,
-			"updatedAt": time.Now(),
-		},
-	}
-
-	filter := bson.M{"email": payload.Claims["email"].(string)}
-
-	opts := options.FindOneAndUpdate().SetUpsert(true).SetReturnDocument(options.After)
-
-	user, err := s.repo.FindOneAndUpdate(ctx, filter, update, opts)
-
+	// Hash password before saving
+	hashedPassword, err := s.HashPassword(user.Password)
 	if err != nil {
-		return nil, fmt.Errorf("failed upsert new account %v", err)
+		return err
 	}
+	user.Password = hashedPassword
 
-	return user, nil
+	return s.repo.Create(user)
 }
 
-func (s *UserService) Update(ctx context.Context, id string, user *model.User) (*model.User, error) {
-	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
-	defer cancel()
-	return s.repo.Update(ctx, id, user)
+func (s *userService) FindUserByEmail(email string) (*model.User, error) {
+	return s.repo.FindByEmail(email)
 }
 
-func (s *UserService) Delete(ctx context.Context, id string) error {
-	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
-	defer cancel()
-	return s.repo.Delete(ctx, id)
+func (s *userService) FindUserByID(id uint) (*model.User, error) {
+	return s.repo.FindByID(id)
+}
+
+func (s *userService) GetAllUsers() ([]model.User, error) {
+	return s.repo.FindAll()
+}
+
+func (s *userService) UpdateUser(user *model.User) error {
+	return s.repo.Update(user)
+}
+
+func (s *userService) DeleteUser(id uint) error {
+	return s.repo.Delete(id)
+}
+
+func (s *userService) ValidatePassword(hashedPassword, password string) error {
+	return bcrypt.CompareHashAndPassword([]byte(hashedPassword), []byte(password))
+}
+
+func (s *userService) HashPassword(password string) (string, error) {
+	bytes, err := bcrypt.GenerateFromPassword([]byte(password), 14)
+	return string(bytes), err
+}
+
+func (s *userService) FindUserByUID(id string) (*model.User, error) {
+	return s.repo.FindByUID(id)
 }

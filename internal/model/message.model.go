@@ -2,16 +2,18 @@ package model
 
 import (
 	"time"
-
-	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 type Message struct {
-	ID          primitive.ObjectID `json:"id" bson:"_id,omitempty"`
-	Content     string             `json:"content" bson:"content"`
-	SenderID    primitive.ObjectID `json:"sender_id" bson:"sender_id"`
-	RecepientID primitive.ObjectID `json:"recepient_id" bson:"recepient_id"`
-	TaskID      string             `json:"task_id" bson:"task_id"`
-	CreatedAt   time.Time
-	UpdatedAt   time.Time
+	ID          uint      `json:"id" gorm:"primaryKey"`
+	Content     string    `json:"content" gorm:"type:text;not null"`
+	SenderID    uint      `json:"sender_id" gorm:"not null;index"`
+	RecipientID uint      `json:"recipient_id" gorm:"not null;index"`
+	TaskID      string    `json:"task_id" gorm:"type:varchar(255)"`
+	CreatedAt   time.Time `json:"createdAt" gorm:"autoCreateTime"`
+	UpdatedAt   time.Time `json:"updatedAt" gorm:"autoUpdateTime"`
+	
+	// Relationships
+	Sender    User `json:"sender,omitempty" gorm:"foreignKey:SenderID;constraint:OnDelete:CASCADE"`
+	Recipient User `json:"recipient,omitempty" gorm:"foreignKey:RecipientID;constraint:OnDelete:CASCADE"`
 }

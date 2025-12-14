@@ -1,0 +1,25 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:latest
+    container_name: postgresql_container
+    restart: always
+    environment:
+      POSTGRES_USER: dev
+      POSTGRES_PASSWORD: Dev1234567
+      POSTGRES_DB: dev
+    ports:
+      - "5435:5432"
+    volumes:
+      - ./postgres_data:/var/lib/postgresql
+    networks:
+      - postgres_network
+
+volumes:
+  postgres_data:
+    driver: local
+
+networks:
+  postgres_network:
+    driver: bridge

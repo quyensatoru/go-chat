@@ -2,94 +2,79 @@ package repository
 
 import (
 	"backend/internal/model"
-	"context"
+	"errors"
 
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
-	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
+	"gorm.io/gorm"
 )
 
-type UserRepository struct {
-	Collection *mongo.Collection
+type UserRepository interface {
+	Create(user *model.User) error
+	FindByEmail(email string) (*model.User, error)
+	FindByID(id uint) (*model.User, error)
+	FindByUID(id string) (*model.User, error)
+	FindAll() ([]model.User, error)
+	Update(user *model.User) error
+	Delete(id uint) error
 }
 
-func NewUserRepository(collection *mongo.Collection) *UserRepository {
-	return &UserRepository{Collection: collection}
+type userRepository struct {
+	db *gorm.DB
 }
 
-func (doc *UserRepository) GetAll(ctx context.Context, filter map[string]interface{}) ([]*model.User, error) {
-	var users []*model.User
-	cursor, err := doc.Collection.Find(ctx, filter)
-
-	if err != nil {
-		return nil, err
-	}
-
-	if err = cursor.All(ctx, &users); err != nil {
-		return nil, err
-	}
-
-	return users, nil
+func NewUserRepository(db *gorm.DB) UserRepository {
+	return &userRepository{db: db}
 }
 
-func (doc *UserRepository) GetByID(ctx context.Context, id string) (*model.User, error) {
-	var user = &model.User{}
-
-	objectId, err := primitive.ObjectIDFromHex(id)
-
-	if err != nil {
-		return nil, err
-	}
-
-	err = doc.Collection.FindOne(ctx, map[string]any{"_id": objectId}).Decode(user)
-	if err != nil {
-		return nil, err
-	}
-	return user, nil
+func (r *userRepository) Create(user *model.User) error {
+	return r.db.Create(user).Error
 }
 
-func (doc *UserRepository) FindOne(ctx context.Context, filter bson.M) (*model.User, error) {
-	var user = &model.User{}
-	err := doc.Collection.FindOne(ctx, filter).Decode(user)
+func (r *userRepository) FindByEmail(email string) (*model.User, error) {
+	var user model.User
+	err := r.db.Where("email = ?", email).First(&user).Error
 	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, nil
+		}
 		return nil, err
 	}
-	return user, nil
+	return &user, nil
 }
 
-func (doc *UserRepository) Create(ctx context.Context, user *model.User) (*model.User, error) {
-	_, err := doc.Collection.InsertOne(ctx, user)
+func (r *userRepository) FindByID(id uint) (*model.User, error) {
+	var user model.User
+	err := r.db.First(&user, id).Error
 	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, nil
+		}
 		return nil, err
 	}
-	return user, nil
+	return &user, nil
 }
 
-func (doc *UserRepository) Update(ctx context.Context, id string, user *model.User) (*model.User, error) {
-	_, err := doc.Collection.UpdateOne(ctx, map[string]interface{}{"_id": id}, map[string]interface{}{"$set": user})
+func (r *userRepository) FindAll() ([]model.User, error) {
+	var users []model.User
+	err := r.db.Find(&users).Error
+	return users, err
+}
+
+func (r *userRepository) Update(user *model.User) error {
+	return r.db.Save(user).Error
+}
+
+func (r *userRepository) Delete(id uint) error {
+	return r.db.Delete(&model.User{}, id).Error
+}
+
+func (r *userRepository) FindByUID(id string) (*model.User, error) {
+	var user model.User
+	err := r.db.Where("token = ?", id).First(&user).Error
 	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, nil
+		}
 		return nil, err
 	}
-	return user, nil
-}
-
-func (doc *UserRepository) Delete(ctx context.Context, id string) error {
-	_, err := doc.Collection.DeleteOne(ctx, map[string]interface{}{"_id": id})
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-func (doc *UserRepository) FindOneAndUpdate(ctx context.Context, filter bson.M, update bson.M, options *options.FindOneAndUpdateOptions) (*model.User, error) {
-	var result model.User
-
-	err := doc.Collection.FindOneAndUpdate(ctx, filter, update, options).Decode(&result)
-
-	if err != nil {
-		return nil, err
-	}
-
-	return &result, nil
+	return &user, nil
 }

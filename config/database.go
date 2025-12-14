@@ -1,32 +1,44 @@
 package config
 
 import (
-	"context"
+	"backend/internal/model"
+	"fmt"
 	"log"
-	"time"
 
-	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
+	"gorm.io/driver/postgres"
+	"gorm.io/gorm"
 )
 
-func ConnectDB() *mongo.Database {
+func ConnectDB() *gorm.DB {
 	env := LoadEnv()
 
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
+	dsn := fmt.Sprintf("host=%s user=%s password=%s dbname=%s port=%s sslmode=disable TimeZone=Asia/Ho_Chi_Minh",
+		env.DBHost,
+		env.DBUser,
+		env.DBPassword,
+		env.DBName,
+		env.DBPort,
+	)
 
-	client, err := mongo.Connect(ctx, options.Client().ApplyURI(env.DatabaseURI))
+	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
 	if err != nil {
-		log.Fatal("❌ Failed to connect to MongoDB:", err)
+		log.Fatal("❌ Failed to connect to PostgreSQL:", err)
 	}
 
-	// Kiểm tra kết nối
-	err = client.Ping(ctx, nil)
+	log.Println("✅ Connected to PostgreSQL")
+
+	// Auto migrate models
+	err = db.AutoMigrate(
+		&model.User{},
+		&model.Message{},
+		&model.Server{},
+		&model.App{},
+	)
 	if err != nil {
-		log.Fatal("❌ Could not ping MongoDB:", err)
+		log.Fatal("❌ Failed to migrate database:", err)
 	}
 
-	log.Println("✅ Connected to MongoDB")
+	log.Println("✅ Database migration completed")
 
-	return client.Database("golang_toturial")
+	return db
 }
