@@ -12,7 +12,7 @@ type MessageRepository interface {
 	FindByID(id uint) (*model.Message, error)
 	FindBySenderID(senderID uint) ([]model.Message, error)
 	FindByRecipientID(recipientID uint) ([]model.Message, error)
-	FindByTaskID(taskID string) ([]model.Message, error)
+	FindByChannel(channelID string, limit int, offset int) ([]model.MessageView, error)
 	FindAll() ([]model.Message, error)
 	Update(message *model.Message) error
 	Delete(id uint) error
@@ -54,9 +54,19 @@ func (r *messageRepository) FindByRecipientID(recipientID uint) ([]model.Message
 	return messages, err
 }
 
-func (r *messageRepository) FindByTaskID(taskID string) ([]model.Message, error) {
-	var messages []model.Message
-	err := r.db.Where("task_id = ?", taskID).Preload("Sender").Preload("Recipient").Find(&messages).Error
+func (r *messageRepository) FindByChannel(channelID string, limit int, offset int) ([]model.MessageView, error) {
+	var messages []model.MessageView
+	err := r.db.
+		Model(&model.Message{}).
+		Select(`
+			id, content, recipient_id AS target_id, sender_id, created_at
+		`).
+		Where("channel_id = ?", channelID).
+		Order("created_at DESC").
+		Limit(limit).
+		Offset(offset).
+		Find(&messages).
+		Error
 	return messages, err
 }
 

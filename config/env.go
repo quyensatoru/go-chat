@@ -19,6 +19,7 @@ type EnvConfig struct {
 	GitlabPrivateToken string
 	GitlabProjectID    string
 	GitOpsToken        string
+	RedisUrl           string
 }
 
 func LoadEnv() *EnvConfig {
@@ -40,5 +41,6 @@ func LoadEnv() *EnvConfig {
 		GitlabPrivateToken: os.Getenv("GITLAB_PRIVATE_TOKEN"),
 		GitlabProjectID:    os.Getenv("GITLAB_PROJECT_ID"),
 		GitOpsToken:        os.Getenv("GITOPS_TOKEN"),
+		RedisUrl:           os.Getenv("REDIS_URL"),
 	}
 }

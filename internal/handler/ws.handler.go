@@ -20,16 +20,20 @@ var upgrader = websocket.Upgrader{
 }
 
 type WsHandler struct {
-	hub         *wsService.Hub
-	msgService  service.MessageService
-	userService service.UserService
+	hub           *wsService.Hub
+	msgService    service.MessageService
+	userService   service.UserService
+	notifyService service.NotificationService
+	redisService  service.RedisService
 }
 
-func NewWsHandler(h *wsService.Hub, msgService service.MessageService, userService service.UserService) *WsHandler {
+func NewWsHandler(h *wsService.Hub, msgService service.MessageService, userService service.UserService, notifyService service.NotificationService, redisService service.RedisService) *WsHandler {
 	return &WsHandler{
-		hub:         h,
-		msgService:  msgService,
-		userService: userService,
+		hub:           h,
+		msgService:    msgService,
+		userService:   userService,
+		notifyService: notifyService,
+		redisService:  redisService,
 	}
 }
 
@@ -61,11 +65,13 @@ func (h *WsHandler) Handle(ctx *gin.Context) {
 	}
 
 	client := &wsService.Client{
-		Hub:         h.hub,
-		Conn:        conn,
-		Send:        make(chan []byte, 256),
-		MsgService:  h.msgService,
-		UserService: h.userService,
+		Hub:           h.hub,
+		Conn:          conn,
+		Send:          make(chan []byte, 256),
+		MsgService:    h.msgService,
+		UserService:   h.userService,
+		NotifyService: h.notifyService,
+		RedisService:  h.redisService,
 	}
 
 	go client.WritePump()

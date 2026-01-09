@@ -33,6 +33,7 @@ func ConnectDB() *gorm.DB {
 		&model.Message{},
 		&model.Server{},
 		&model.App{},
+		&model.Notification{},
 	)
 	if err != nil {
 		log.Fatal("❌ Failed to migrate database:", err)

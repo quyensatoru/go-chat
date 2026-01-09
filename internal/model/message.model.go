@@ -9,11 +9,19 @@ type Message struct {
 	Content     string    `json:"content" gorm:"type:text;not null"`
 	SenderID    uint      `json:"sender_id" gorm:"not null;index"`
 	RecipientID uint      `json:"recipient_id" gorm:"not null;index"`
-	TaskID      string    `json:"task_id" gorm:"type:varchar(255)"`
+	ChannelID   string    `json:"channel_id" gorm:"type:varchar(255)"`
 	CreatedAt   time.Time `json:"createdAt" gorm:"autoCreateTime"`
 	UpdatedAt   time.Time `json:"updatedAt" gorm:"autoUpdateTime"`
-	
+
 	// Relationships
 	Sender    User `json:"sender,omitempty" gorm:"foreignKey:SenderID;constraint:OnDelete:CASCADE"`
 	Recipient User `json:"recipient,omitempty" gorm:"foreignKey:RecipientID;constraint:OnDelete:CASCADE"`
+}
+
+type MessageView struct {
+	ID        uint      `json:"id"`
+	Content   string    `json:"content"`
+	TargetID  uint      `json:"target_id"`
+	SenderID  uint      `json:"sender_id"`
+	CreatedAt time.Time `json:"created_at"`
 }

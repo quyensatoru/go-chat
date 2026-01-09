@@ -10,7 +10,7 @@ type MessageService interface {
 	GetMessageByID(id uint) (*model.Message, error)
 	GetMessagesBySenderID(senderID uint) ([]model.Message, error)
 	GetMessagesByRecipientID(recipientID uint) ([]model.Message, error)
-	GetMessagesByTaskID(taskID string) ([]model.Message, error)
+	GetMessagesByChannel(channelID string, limit int, offset int) ([]model.MessageView, error)
 	GetAllMessages() ([]model.Message, error)
 	UpdateMessage(message *model.Message) error
 	DeleteMessage(id uint) error
@@ -40,8 +40,8 @@ func (s *messageService) GetMessagesByRecipientID(recipientID uint) ([]model.Mes
 	return s.repo.FindByRecipientID(recipientID)
 }
 
-func (s *messageService) GetMessagesByTaskID(taskID string) ([]model.Message, error) {
-	return s.repo.FindByTaskID(taskID)
+func (s *messageService) GetMessagesByChannel(channelID string, limit int, offset int) ([]model.MessageView, error) {
+	return s.repo.FindByChannel(channelID, limit, offset)
 }
 
 func (s *messageService) GetAllMessages() ([]model.Message, error) {

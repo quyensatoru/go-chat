@@ -78,7 +78,7 @@ func (s *serverAutomationService) InstallK8s(server *model.Server, branch, argoC
 
 	//  Step 1: Install K3s
 	fmt.Println("📦 Installing K3s...")
-	k3sInstallCmd := `curl -sfL https://get.k3s.io | sh -`
+	k3sInstallCmd := `curl -sfL https://get.k3s.io | sh -s - --disable=traefik --disable=servicelb`
 	_, err = client.Run(k3sInstallCmd)
 	if err != nil {
 		return fmt.Errorf("failed to install K3s: %w", err)
@@ -99,6 +99,31 @@ func (s *serverAutomationService) InstallK8s(server *model.Server, branch, argoC
 	_, err = client.Run(helmInstallCmd)
 	if err != nil {
 		return fmt.Errorf("failed to install Helm: %w", err)
+	}
+
+	// pre install ingresss controller - stop nginx local
+	cmdStopNginx := `systemctl stop nginx`
+	_, err = client.Run(cmdStopNginx)
+
+	if err != nil {
+		return fmt.Errorf("failed to stop nginx")
+	}
+
+	// install nginx ingress controller
+	helmAddRepoCmd := `helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx`
+	_, err = client.Run(helmAddRepoCmd)
+	if err != nil {
+		return fmt.Errorf("failed to add ingress-nginx helm repo: %w", err)
+	}
+	helmUpdateCmd := `helm repo update`
+	_, err = client.Run(helmUpdateCmd)
+	if err != nil {
+		return fmt.Errorf("failed to update helm repos: %w", err)
+	}
+	helmInstallNginxCmd := `KUBECONFIG=/tmp/kubeconfig helm install nginx-ingress ingress-nginx/ingress-nginx --namespace ingress-nginx --create-namespace --set controller.hostNetwork=true --set controller.kind=DaemonSet --set controller.service.type=ClusterIP --set controller.dnsPolicy=ClusterFirstWithHostNet`
+	_, err = client.Run(helmInstallNginxCmd)
+	if err != nil {
+		return fmt.Errorf("failed to install nginx ingress controller via helm: %w", err)
 	}
 
 	// Step 3: Install ArgoCD
@@ -124,18 +149,47 @@ func (s *serverAutomationService) InstallK8s(server *model.Server, branch, argoC
 	if argoCDPassword != "" {
 		// Get ArgoCD server pod
 		getPodCmd := `sudo k3s kubectl get pods -n argocd -l app.kubernetes.io/name=argocd-server -o jsonpath='{.items[0].metadata.name}'`
-		podName, err := client.Run(getPodCmd)
+		_, err := client.Run(getPodCmd)
 		if err != nil {
 			return fmt.Errorf("failed to get ArgoCD server pod: %w", err)
 		}
 
 		// Update password
 		updatePasswordCmd := fmt.Sprintf(
-			`sudo k3s kubectl -n argocd exec %s -- argocd account update-password --current-password $(sudo k3s kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath="{.data.password}" | base64 -d) --new-password %s`,
-			strings.TrimSpace(string(podName)),
+			`kubectl -n argocd patch secret argocd-secret -p '{"stringData": {"admin.password": "'$(htpasswd -nbBC 10 "" "%s" | tr -d ':\n' | sed 's/$2y/$2a/')'", "admin.passwordMtime": "'$(date +%FT%T%Z)'"}}'`,
 			argoCDPassword,
 		)
 		_, _ = client.Run(updatePasswordCmd) // Ignore errors as password might already be set
+	}
+
+	// apply ingress for argocd server
+	ingressArgoCmd := `cat <<EOF | sudo k3s kubectl apply -f -
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: argocd-server-ingress
+  namespace: argocd
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-connect-timeout: "600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "600"
+spec:
+  ingressClassName: nginx
+  rules:
+  - host: devops.mida-app.io
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: argocd-server
+            port:
+              number: 80
+EOF`
+
+	_, err = client.Run(ingressArgoCmd)
+	if err != nil {
+		return fmt.Errorf("failed to create ArgoCD ingress: %w", err)
 	}
 
 	dir, err := os.Getwd()
@@ -189,6 +243,10 @@ EOF`, string(secretStore))
 		return fmt.Errorf("failed to expose ArgoCD server: %w", err)
 	}
 
+	_, err = client.Run(`kubectl patch deployment argocd-server -n argocd --type='json' -p='[{"op": "add", "path": "/spec/template/spec/containers/0/args/-", "value": "--insecure"}]'`)
+	if err != nil {
+		return fmt.Errorf("failed to disable insecure mode: %w", err)
+	}
 	fmt.Println("✅ K8s installation completed successfully!")
 	return nil
 }
@@ -209,7 +267,23 @@ func (s *serverAutomationService) DeployArgoCDApp(app *model.App) error {
 
 	for _, svc := range app.Services {
 		var stringParse interface{}
-		err := json.Unmarshal([]byte(svc.EnvRaw), &stringParse)
+		//replace env into raw env
+		replacements := map[string]string{
+			"$(MONGODB_HOST)":      app.Name + "-" + svc.Name + "-mongodb",
+			"$(REDIS_HOST)":        app.Name + "-" + svc.Name + "-redis-master",
+			"$(RABBITMQ_HOST)":     app.Name + "-" + svc.Name + "-rabbitmq",
+			"$(MONGODB_PORT)":      "27017",
+			"$(REDIS_PORT)":        "6379",
+			"$(RABBITMQ_PORT)":     "5672",
+			"$(RABBITMQ_USER)":     "guest",
+			"$(RABBITMQ_PASSWORD)": "guest",
+		}
+		rawEnv := svc.EnvRaw
+
+		for oldValue, newValue := range replacements {
+			rawEnv = strings.ReplaceAll(rawEnv, oldValue, newValue)
+		}
+		err := json.Unmarshal([]byte(rawEnv), &stringParse)
 		if err != nil {
 			return fmt.Errorf("failed to unmarshal service env: %w", err)
 		}
@@ -220,7 +294,7 @@ func (s *serverAutomationService) DeployArgoCDApp(app *model.App) error {
 			return fmt.Errorf("failed to marshal service env: %w", err)
 		}
 
-		log.Printf("json env %v", jsonEnv)
+		log.Printf("json env %v", string(jsonEnv))
 
 		variableName := app.Name + "_" + svc.Name
 		variable := struct {
@@ -306,7 +380,12 @@ func (s *serverAutomationService) DeployArgoCDApp(app *model.App) error {
 	// fileValueCms := filepath.Join(newDir, "values-cms.yaml")
 
 	os.MkdirAll(newDir, 0755)
-	os.WriteFile(fileValueApi, []byte("keyEnv: "+app.Name+"_"+app.Services[0].Name), 0644)
+	contentEnv := fmt.Sprintf(
+		"keyEnv: %s\npath: %s",
+		app.Name+"_"+app.Services[0].Name,
+		"/"+app.Name+"-"+app.Services[0].Name,
+	)
+	os.WriteFile(fileValueApi, []byte(contentEnv), 0644)
 	// os.WriteFile(fileValueCms, []byte("keyEnv: "+app.Name+"_"+app.Services[1].Name), 0644)
 
 	_, err = worktree.Add(".")
@@ -361,8 +440,8 @@ func (s *serverAutomationService) DeployArgoCDApp(app *model.App) error {
 %s	
 EOF`, indent(manifet, 0))
 
-	_, err = client.Run(createAppCmd)
-	fmt.Printf("create argocd application result: %s", string(createAppCmd))
+	result, err := client.Run(createAppCmd)
+	fmt.Printf("create argocd application result: %s", string(result))
 	if err != nil {
 		return fmt.Errorf("failed to create ArgoCD application: %w", err)
 	}

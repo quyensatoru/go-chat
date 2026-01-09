@@ -3,8 +3,10 @@ package main
 import (
 	"backend/config"
 	"backend/internal/app"
+	"fmt"
 	"time"
 
+	"github.com/SherClockHolmes/webpush-go"
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 )
@@ -12,6 +14,7 @@ import (
 func main() {
 	db := config.ConnectDB()
 	fb := config.ConnectFirebase()
+	redis := config.ConnectRedis()
 
 	g := gin.Default()
 
@@ -26,7 +29,15 @@ func main() {
 	}))
 
 	//initialize routes
-	app.Router(g, db, fb)
+	app.Router(g, db, fb, redis)
+
+	privateKey, publicKey, err := webpush.GenerateVAPIDKeys()
+	if err != nil {
+		panic(err)
+	}
+
+	fmt.Println("Public Key:", publicKey)
+	fmt.Println("Private Key:", privateKey)
 
 	g.Run(":3000")
 }

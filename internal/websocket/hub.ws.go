@@ -7,7 +7,7 @@ import (
 
 type Broadcast struct {
 	ConversationId string `json:"conversation_id"`
-	Data           []byte `json:"data"`
+	Content        []byte `json:"content"`
 }
 
 type Hub struct {
@@ -62,7 +62,7 @@ func (h *Hub) Run() {
 			if clients, ok := h.Channels[message.ConversationId]; ok {
 				for client := range clients {
 					select {
-					case client.Send <- message.Data:
+					case client.Send <- message.Content:
 					default:
 						// if !client.Closed {
 						// 	close(client.Send)
