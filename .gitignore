@@ -2,4 +2,5 @@
 .env
 /tmp/*
 # config firebase
-serviceAccountKey.json  
+serviceAccountKey.json
+development

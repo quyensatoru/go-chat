@@ -5,8 +5,11 @@ import (
 )
 
 type ServiceConfig struct {
-	Name   string `json:"name"`
-	EnvRaw string `json:"env_raw" gorm:"serializer:json"` // Raw environment variables as string
+	Name        string   `json:"name"`
+	ImageURL    string   `json:"image_url"`                      // Docker image repository (e.g., registry.example.com/app)
+	ImageTag    string   `json:"image_tag"`                      // Docker image tag (e.g., v1.0.0, latest)
+	SubServices []string `json:"sub_services"`                   // Selected sub-services: rabbitmq, redis, mongodb, postgresql, mysql, elasticsearch
+	EnvRaw      string   `json:"env_raw" gorm:"serializer:json"` // Raw environment variables as string
 }
 
 type App struct {
@@ -15,6 +18,7 @@ type App struct {
 	HelmChart string          `json:"helm_chart" gorm:"type:varchar(500)"`
 	ServerID  uint            `json:"server_id" gorm:"not null;index"`
 	Status    string          `json:"status" gorm:"type:varchar(50);default:'inactive'"`
+	Domain    string          `json:"domain" gorm:"type:varchar(255);"`
 	Services  []ServiceConfig `json:"services" gorm:"serializer:json"`
 	CreatedAt time.Time       `json:"createdAt" gorm:"autoCreateTime"`
 	UpdatedAt time.Time       `json:"updatedAt" gorm:"autoUpdateTime"`

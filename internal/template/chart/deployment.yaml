@@ -2,12 +2,13 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: {{ include "app.fullname" . }}
+  namespace: {{ .Release.Namespace }}
   labels:
     app: {{ include "app.name" . }}
 spec:
   replicas: {{ .Values.replicaCount }}
   selector:
-    matchLavels:
+    matchLabels:
       app: {{ include "app.name" . }}
   template:
     metadata:
@@ -21,7 +22,15 @@ spec:
         ports:
           - containerPort: {{ .Values.service.targetPort }}
         envFrom:
+        {{- if .Values.configmap.enabled }}
           - configMapRef:
-             name: {{ include "app.fullname" . }}-config
+              name: {{ include "app.fullname" . }}-config
+        {{- end }}
+        {{- if .Values.secret.enabled }}
           - secretRef:
-             name: {{ include "app.fullname" . }}-secret
+              name: {{ include "app.fullname" . }}-secret
+        {{- end }}
+
+
+
+

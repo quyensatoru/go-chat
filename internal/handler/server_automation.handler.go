@@ -86,7 +86,6 @@ func (h *ServerAutomationHandler) InstallK8s(c *gin.Context) {
 
 	// Parse request body
 	var req struct {
-		GitBranch           string `json:"git_branch"`
 		ArgoCDAdminPassword string `json:"argocd_admin_password"`
 	}
 
@@ -97,7 +96,7 @@ func (h *ServerAutomationHandler) InstallK8s(c *gin.Context) {
 
 	// Run installation in background to avoid timeout
 	go func() {
-		err := h.automationSvc.InstallK8s(server, req.GitBranch, req.ArgoCDAdminPassword)
+		err := h.automationSvc.InstallK8s(server, req.ArgoCDAdminPassword)
 		if err != nil {
 			// Log error
 			println("K8s installation failed:", err.Error())

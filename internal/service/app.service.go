@@ -38,19 +38,14 @@ func (s *appService) CreateApp(app *model.App) error {
 		return err
 	}
 
-	// Set default status if not provided
 	if app.Status == "" {
 		app.Status = "inactive" // Will be updated to active if deploy succeeds? Or keep inactive?
 	}
 
-	// Save app to DB first
 	if err := s.repo.Create(app); err != nil {
 		return err
 	}
 
-	// Fetch server details (Username, IP, Password) needed for SSH
-	// CreateApp might not load relation, so fetch server explicitly or rely on repo preloading if available.
-	// But `app.Server` might be empty.
 	server, err := s.serverRepo.FindByID(app.ServerID)
 	if err != nil {
 		return err
