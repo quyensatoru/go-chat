@@ -20,13 +20,12 @@ type EnvConfig struct {
 	GitlabProjectID    string
 	GitOpsToken        string
 	RedisUrl           string
+	AppEnv             string
 }
 
 func LoadEnv() *EnvConfig {
-	err := godotenv.Load()
-
-	if err != nil {
-		log.Fatal("Error loading .env file")
+	if err := godotenv.Load(); err != nil {
+		log.Println("No .env file found, continuing with environment variables")
 	}
 
 	return &EnvConfig{
@@ -42,5 +41,6 @@ func LoadEnv() *EnvConfig {
 		GitlabProjectID:    os.Getenv("GITLAB_PROJECT_ID"),
 		GitOpsToken:        os.Getenv("GITOPS_TOKEN"),
 		RedisUrl:           os.Getenv("REDIS_URL"),
+		AppEnv:             os.Getenv("APP_ENV"),
 	}
 }

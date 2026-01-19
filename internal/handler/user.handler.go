@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"backend/config"
 	"backend/internal/model"
 	"backend/internal/response"
 	"backend/internal/service"
@@ -76,6 +77,15 @@ func (h *UserHandler) CreateNewAccount(c *gin.Context) {
 		response.InternalError(c, "failed to get user info from Firebase")
 		return
 	}
+	appEnv := config.LoadEnv().AppEnv
+
+	host := "localhost"
+	secure := false
+
+	if appEnv == "PRODUCTION" {
+		host = ".quyenpv.site"
+		secure = true
+	}
 
 	// Check if user exists
 	existingUser, err := h.userSvc.FindUserByEmail(userFb.Email)
@@ -97,8 +107,8 @@ func (h *UserHandler) CreateNewAccount(c *gin.Context) {
 			token,
 			120000,
 			"/",
-			"localhost",
-			false,
+			host,   // ✅ shared cho subdomain dùng cho production
+			secure, // ✅ Secure (HTTPS)
 			true,
 		)
 		c.JSON(200, existingUser)
@@ -124,8 +134,8 @@ func (h *UserHandler) CreateNewAccount(c *gin.Context) {
 		token,
 		120000,
 		"/",
-		"localhost",
-		false,
+		host,
+		secure,
 		true,
 	)
 	c.JSON(201, newUser)

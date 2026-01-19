@@ -4,7 +4,6 @@ import (
 	"backend/config"
 	"backend/internal/app"
 	"fmt"
-	"time"
 
 	"github.com/SherClockHolmes/webpush-go"
 	"github.com/gin-contrib/cors"
@@ -20,12 +19,11 @@ func main() {
 
 	// Configure CORS to allow the frontend to send Authorization header and credentials
 	g.Use(cors.New(cors.Config{
-		AllowOrigins:     []string{"http://localhost:3000", "http://localhost:3001"},
-		AllowMethods:     []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
-		AllowHeaders:     []string{"Origin", "Content-Type", "Accept", "Authorization"},
-		ExposeHeaders:    []string{"Content-Length"},
-		AllowCredentials: true,
-		MaxAge:           12 * time.Hour,
+		AllowOrigins:     []string{"http://locahost:3001","https://chat.quyenpv.site"},
+        AllowMethods:     []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
+        AllowHeaders:     []string{"Origin", "Content-Type", "Accept", "Authorization"},
+        ExposeHeaders:    []string{"Content-Length"},
+        AllowCredentials: true,
 	}))
 
 	//initialize routes

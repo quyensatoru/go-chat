@@ -1,34 +1,42 @@
 # Build stage
 FROM golang:1.24.3-alpine AS builder
 
-# Install git for fetching dependencies
-RUN apk add --no-cache git
+RUN apk add --no-cache git ca-certificates
 
 WORKDIR /app
 
-# Copy go mod and sum files
+# Cache dependencies
 COPY go.mod go.sum ./
-
-# Download all dependencies. Dependencies will be cached if the go.mod and go.sum files are not changed
 RUN go mod download
 
-# Copy the source from the current directory to the Working Directory inside the container
+# Copy source
 COPY . .
 
-# Build the Go app
-RUN go build -o server ./cmd/main.go
+# Build static binary
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 \
+    go build -ldflags="-s -w" -o server ./cmd/main.go
 
-# Run stage
-FROM alpine:latest
+
+# =========================
+# Runtime stage
+# =========================
+FROM alpine:3.19
+
+# Install certs (HTTPS, Firebase, Google APIs, etc.)
+RUN apk add --no-cache ca-certificates tzdata \
+    && addgroup -S app \
+    && adduser -S app -G app
+
+ENV TZ=Asia/Ho_Chi_Minh
 
 WORKDIR /app
 
-# Copy the Pre-built binary from the previous stage
+# Copy binary only
 COPY --from=builder /app/server .
-COPY --from=builder /app/.env . 
 
-# Expose port 3000 to the outside world
+# Use non-root user
+USER app
+
 EXPOSE 3000
 
-# Command to run the executable
 CMD ["./server"]
